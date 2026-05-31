@@ -1,4 +1,4 @@
-﻿#include <SFML/Graphics.hpp>
+#include <SFML/Graphics.hpp>
 #include <iostream>
 #include <vector>
 #include <queue>
@@ -6,12 +6,12 @@
 #include <algorithm>
 #include <random>
 
-const int GRID_SIZE     = 60; // Размер поля NxN
-const int CELL_SIZE     = 20; // Размер одной ячейки в пикселях
+const int GRID_SIZE     = 30; // Размер поля NxN
+const int CELL_SIZE     = 30; // Размер одной ячейки в пикселях
 const int WINDOW_SIZE   = GRID_SIZE * CELL_SIZE;
 
-const int MAX_RAND_COST = 100;
-const int OBSTACLE_PROB = 30; // %
+const int MAX_RAND_COST = 10;
+const int OBSTACLE_PROB = 20; // %
 const int GRID[10][10] = {
 	{0,0,0,0,0,0,0,1,1,0},
 	{1,0,0,1,0,0,1,0,0,0},
@@ -20,9 +20,9 @@ const int GRID[10][10] = {
 	{1,0,0,0,0,0,1,0,0,1},
 	{1,0,0,0,0,0,0,0,0,0},
 	{0,0,0,0,0,1,0,1,0,0},
-	{3,0,0,0,1,0,1,1,0,0},
+	{2,0,0,0,1,0,1,1,0,0},
 	{0,1,0,1,0,0,0,0,0,0},
-	{0,0,1,0,1,0,1,0,0,4}
+	{0,0,1,0,1,0,1,0,0,3}
 };
 
 // Типы ячеек
@@ -61,7 +61,7 @@ int heuristic(const Cell& a, const Cell& b) {
 int refresh_path(std::vector<std::vector<Cell>>& grid, Cell start, Cell end)
 {
 	int x = end.px, y = end.py;
-	while (!(x == 0 && y == 0))
+	while (x >= 0 and y >= 0)
 	{
 		int px = grid[x][y].px;
 		int py = grid[x][y].py;
@@ -91,11 +91,14 @@ int a_star(std::vector<std::vector<Cell>> &grid, Cell& start, Cell& end)
 
 		for (int i = 0; i < 4; i++)
 		{
-			if (x + dx[i] < GRID_SIZE && y + dy[i] < GRID_SIZE &&
-				x + dx[i] >= 0 && y + dy[i] >= 0 &&
-				grid[x + dx[i]][y + dy[i]].type != OBSTACLE &&
-				!(grid[x + dx[i]][y + dy[i]].type == VISITED))
+			if (!(x + dx[i] < GRID_SIZE && y + dy[i] < GRID_SIZE &&
+				x + dx[i] >= 0 && y + dy[i] >= 0))
+				continue;
+				
+			if (grid[x + dx[i]][y + dy[i]].type != OBSTACLE && 
+				!(grid[x + dx[i]][y + dy[i]].type == VISITED || grid[x + dx[i]][y + dy[i]].type == START))
 			{
+				
 				int g = current->g + grid[x + dx[i]][y + dy[i]].cost;
 				if (g < grid[x + dx[i]][y + dy[i]].g)
 				{
@@ -132,6 +135,7 @@ std::vector<std::vector<Cell>> random_grid()
 	}
 	grid[0][0].type = START;
 	grid[0][0].g = 0;
+	grid[0][0].cost = 0;
 	grid[GRID_SIZE - 1][GRID_SIZE - 1].type = END;
 
 	return grid;
@@ -144,7 +148,7 @@ std::vector<std::vector<Cell>> reconstruct_grid()
 	{
 		for (int y = 0; y < 10; y++)
 		{
-			if (GRID[x][y] == 4)
+			if (GRID[x][y] == 3)
 			{
 				ex = x; ey = y;
 				break;
@@ -157,7 +161,7 @@ std::vector<std::vector<Cell>> reconstruct_grid()
 		{
 			grid[x].push_back(Cell(x, y));
 			grid[x][y].type = CellType(GRID[x][y]);
-			grid[x][y].g = GRID[x][y] != 3 ? 100 : 0;
+			grid[x][y].g = 100;
 			grid[x][y].h = heuristic(grid[x][y], Cell(ex, ey));
 		}
 	}
@@ -166,18 +170,48 @@ std::vector<std::vector<Cell>> reconstruct_grid()
 
 int main()
 {
+	sf::Font font;
+	sf::Text text;
+
+	if (!font.loadFromFile("arial.ttf")) {
+		return -1;
+	}
+
+	text.setFont(font);
+	text.setFillColor(sf::Color::Black);
+	text.setCharacterSize(CELL_SIZE / 2);
 	std::vector<std::vector<Cell>> grid = random_grid();
-	std::cout << (a_star(grid, grid[0][0], grid[GRID_SIZE - 1][GRID_SIZE - 1]) ? "no path((\n" : "found");
+	int sx = -1, sy = -1, ex = -1, ey = -1;
+	for (auto& r: grid)
+	{
+		for (Cell& i: r)
+		{
+			if (i.type == END)
+			{
+				ex = i.x; ey = i.y;
+			}
+			if (i.type == START)
+			{
+				i.g = 0;
+				sx = i.x; sy = i.y;
+			}
+		}
+	}
+	std::cout << (a_star(grid, grid[sx][sy], grid[ex][ey]) ? "no path((\n" : "found");
 	sf::RenderWindow window(sf::VideoMode(WINDOW_SIZE, WINDOW_SIZE), "astar or smth");
 	while (window.isOpen())
 	{
 		sf::Event event;
 		while (window.pollEvent(event))
 		{
-			if (event.type == sf::Event::Closed)
+			if (event.type == sf::Event::Closed) {
 				window.close();
+			}
+			else if (event.type == sf::Event::MouseButtonPressed) {
+				grid = random_grid();
+				std::cout << (a_star(grid, grid[sx][sy], grid[ex][ey]) ? "no path((\n" : "found\n");
+			}
 		}
-
 		window.clear();
 		for (int i = 0; i < GRID_SIZE; ++i) {
 			for (int j = 0; j < GRID_SIZE; ++j) {
@@ -192,6 +226,12 @@ int main()
 				case VISITED:  cell.setFillColor(sf::Color::Cyan);  break;
 				}
 				window.draw(cell);
+				if (MAX_RAND_COST > 1)
+				{
+					text.setString(sf::String(std::to_string(grid[i][j].cost)));
+					text.setPosition(i * CELL_SIZE, j * CELL_SIZE);
+					window.draw(text);
+				}
 			}
 		}
 		window.display();
